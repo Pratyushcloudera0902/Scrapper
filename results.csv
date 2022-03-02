@@ -1,0 +1,14 @@
+Job Name:,TeraSort
+User Name:,pratyush
+Queue:,default
+State:,SUCCEEDED
+Uberized:,false
+Submitted:,Wed Mar 02 05:02:12 UTC 2022
+Started:,Wed Mar 02 05:02:25 UTC 2022
+Finished:,Wed Mar 02 05:07:31 UTC 2022
+Elapsed:,"5mins, 6sec"
+Diagnostics:,
+Average Map Time,14sec
+Average Shuffle Time,9sec
+Average Merge Time,19sec
+Average Reduce Time,"3mins, 56sec"
