@@ -12,7 +12,7 @@ def sshConnect():  # done
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print("connecting...")
     client.connect(hostname="172.27.133.3", username="root", pkey=private_key, password="password")
-    print("connected!!")
+    print("connected....")
     return client
 
 
@@ -74,6 +74,8 @@ def scrapeData(output):
     if tera_table is None:
         print("Empty webpage, retrying process again")
         main()
+        c.close()
+        print("SSH Closed....")
         exit(0)
     else:
         # Store all the headers
@@ -144,5 +146,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# c.close()
-# print("SSH Closed!")
+c.close()
+print("SSH Closed....")
