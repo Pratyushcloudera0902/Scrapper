@@ -3,7 +3,7 @@ import requests
 import csv
 
 # Retrieve the HTML
-url = "http://pra-bup-2.pra-bup.root.hwx.site:8088/proxy/application_1646195852633_0026/"
+url = "http://pra-bup-2.pra-bup.root.hwx.site:8088/proxy/application_1646195852633_0024/"
 html_content = requests.get(url).text
 
 # Make a soup object for easy parsing
@@ -37,6 +37,7 @@ data = {}
 for i in range(length):
     data[headers[i]] = values[i]
 print(data)
+
 
 # write the result into a CSV
 a_file = open("results.csv", "w")
