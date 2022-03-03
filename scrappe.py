@@ -3,7 +3,7 @@ import requests
 import csv
 
 # Retrieve the HTML
-url = "http://pratyush-1.pratyush.root.hwx.site:19888/jobhistory/job/job_1646194582429_0006"
+url = "http://pra-bup-2.pra-bup.root.hwx.site:8088/proxy/application_1646195852633_0026/"
 html_content = requests.get(url).text
 
 # Make a soup object for easy parsing
@@ -12,7 +12,11 @@ soup = BeautifulSoup(html_content, "html.parser")
 # Get the needed table
 tera_table = soup.find("table", attrs={"class": "info"})
 
+if tera_table is None:
+    print("YEs")
+    exit(0)
 # Store all the headers
+
 headers = []
 for i in tera_table.find_all("th"):
     title = i.text.replace('\n', ' ').strip()

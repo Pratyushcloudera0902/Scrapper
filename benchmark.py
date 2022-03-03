@@ -1,9 +1,9 @@
-import json
 import time
 import paramiko
+import re
+from bs4 import BeautifulSoup
+import requests
 
-
-# import re
 
 # SSH Connection to Ozone
 def sshConnect():  # done
@@ -11,83 +11,134 @@ def sshConnect():  # done
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print("connecting...")
-    client.connect(hostname="172.27.38.132", username="root", pkey=private_key, password="password")
+    client.connect(hostname="172.27.133.3", username="root", pkey=private_key, password="password")
     print("connected!!")
     return client
 
 
-def switchUser(user):
-    command_formation = f"su - {user}"
+def teraGen(jar_loc):
+    command_formation = f"sudo -u pratyush /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 /tera/teraoutputs/terasort-input"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
-    # err = stderr.read().decode().strip()
-    # print(type(err))
-    # print(err)
-    return stderr, stdout
+    return stdout, stderr
 
 
-def createLocationOzone(vol_name, buck_name):
-    command_formation = f"ozone fs -mkdir -p ofs://ozone1/{vol_name}/{buck_name}"
+def teraSort(jar_loc):
+    command_formation = f"sudo -u pratyush /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} terasort /tera/teraoutputs/terasort-input /tera/teraoutputs/terasort-output"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
-    out = stdout.read().decode().strip()
-    err = stderr.read().decode().strip()
-    print(out, err)
-    print(type(out), type(err))
-    return err
+    return stdout, stderr
 
 
-def teragen(size, output_folder):
-    pass
-    # stdin, stdout, stderr = c.exec_command(command_formation)
+def teraValidate(jar_loc):
+    command_formation = f"sudo -u pratyush /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teravalidate /tera/teraoutputs/terasort-output /tera/teraoutputs/teravalidate-output"
+    stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
+    return stdout, stderr
 
 
 def getJarLocation():
     command_formation = f"find /opt/cloudera/parcels/CDH/jars -name '*hadoop*mapreduce*example*'"
     stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
     out = stdout.read().decode().strip()
     return out
 
 
-def teragen(jar_location, output_location, size):
-    command_formation = f"hadoop jar {jar_location} teragen {size} {output_location}"
-    stdin, stdout, stderr = c.exec_command(command_formation)
-    out = stdout.read().decode().strip()
-    return out
-
-
-def getUser():
-    command_formation = f"pwd"
+def createDirectory():
+    command_formation = f"sudo -u pratyush ozone fs -mkdir -p ofs://ozone1/tera/teraoutputs/"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
-    # inn = stdin.read().decode().strip()
-    out = stdout.read().decode().strip()
-    print(out)
+    return stdout, stderr
+
+
+def removeDirectory():
+    command_formation = f"sudo -u pratyush ozone fs -rm -r -skipTrash ofs://ozone1/tera/"
+    stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
+    return stdout, stderr
+
+
+def scrapeData(output):
+    url = re.search(r'The url to track the job: (.*)', output).group(1)
+    # Retrieve the HTML
+    html_content = requests.get(url).text
+
+    # Make a soup object for easy parsing
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    # Get the needed table
+    tera_table = soup.find("table", attrs={"class": "info"})
+
+    # Sometimes webpage created are empty, in those cases rerun the code.
+    if tera_table is None:
+        print("Empty webpage, retrying process again")
+        main()
+        exit(0)
+    else:
+        # Store all the headers
+        headers = []
+        for i in tera_table.find_all("th"):
+            title = i.text.replace('\n', ' ').strip()
+            headers.append(title)
+        headers = headers[1:]
+        # print(headers)
+
+        # Store all the values
+        values = []
+        for i in tera_table.find_all("td"):
+            title = i.text.replace('\n', ' ').strip()
+            values.append(title)
+        # print(values)
+
+        # Convert into a dictionary
+        length = len(headers)
+        data = {}
+        for i in range(length):
+            data[headers[i]] = values[i]
+
+        return data
 
 
 c = sshConnect()
 
 
 def main():
-    # switchUser("pratyush")
-    getUser()
-    err, out = switchUser("pratyush")
-    err_relaxed = err.read().decode().strip()
-    out_relaxed = out.read().decode().strip()
-    print(err_relaxed, out_relaxed)
-    getUser()
-    # err = createLocationOzone("scrappe5", "scrapbucket")
-    # if err == "":
-    #     print("Location created")
-    # else:
-    #     print("Failed!", err)
-    # location = getJarLocation()
-    # print(location)
-    #
-    # results = teragen(location, "/tmp/terascript/teraoutputs/terasort-input", "100000000")
-    # print(results)
-    # terasort()
-    # teraValidate()
+    # Clean the directory
+    removeDirectory()
+    print("Directory removed")
+    # Create the directory
+    createDirectory()
+    print("Directory created")
+    jar_loc = getJarLocation().strip()
+
+    print("Teragen executing....")
+    stderr, stdout = teraGen(jar_loc)
+    err_relaxed = stderr.read().decode().strip()
+    print(err_relaxed)
+    out = stdout.read().decode().strip()
+    # print(out)
+    teragen_result = scrapeData(out)
+
+    print("Terasort executing....")
+    stderr1, stdout1 = teraSort(jar_loc)
+    err_relaxed1 = stderr1.read().decode().strip()
+    print(err_relaxed1)
+    out1 = stdout1.read().decode().strip()
+    # print(out1)
+    terasort_result = scrapeData(out1)
+
+    print("Teravalidate executing....")
+    stderr2, stdout2 = teraValidate(jar_loc)
+    err_relaxed2 = stderr2.read().decode().strip()
+    print(err_relaxed2)
+    out2 = stdout2.read().decode().strip()
+    # print(out2)
+    teravalidate_result = scrapeData(out2)
+
+    print("Teragen result", teragen_result)
+    print("Terasort result", terasort_result)
+    print("Teravalidate result", teravalidate_result)
 
 
 if __name__ == "__main__":
