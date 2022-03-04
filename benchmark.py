@@ -74,9 +74,7 @@ def scrapeData(output):
     if tera_table is None:
         print("Empty webpage, retrying process again")
         main()
-        c.close()
-        print("SSH Closed....")
-        exit(0)
+        pass
     else:
         # Store all the headers
         headers = []
@@ -100,6 +98,12 @@ def scrapeData(output):
             data[headers[i]] = values[i]
 
         return data
+
+
+def closeConnection():
+    c.close()
+    print("SSH Closed....")
+    exit(0)
 
 
 c = sshConnect()
@@ -138,13 +142,14 @@ def main():
     # print(out2)
     teravalidate_result = scrapeData(out2)
 
+    # Print the results
     print("Teragen result", teragen_result)
     print("Terasort result", terasort_result)
     print("Teravalidate result", teravalidate_result)
 
+    # Close the connection
+    closeConnection()
+
 
 if __name__ == "__main__":
     main()
-
-c.close()
-print("SSH Closed....")
