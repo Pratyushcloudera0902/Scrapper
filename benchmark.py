@@ -18,24 +18,65 @@ def sshConnect():  # done
     return client
 
 
-def teraGen(jar_loc):
-    command_formation = f"sudo -u pratyush /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
+def getHDFSNameNode():
+    command_formation = "hdfs getconf -namenodes"
+    stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
+    out = stdout.read().decode().strip()
+    return out
+
+
+def getCurrentFS():
+    command_formation = "grep  -m 1 '<value>' /etc/hadoop/conf/core-site.xml"
+    stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
+    out = stdout.read().decode().strip()
+    return out
+
+
+def changeCoreSite(current_fs, new_fs):
+    command_formation = f"grep -i -m 1 '<value>' /etc/hadoop/conf/core-site.xml | sed -i '0,/{current_fs}/s//{new_fs}/' /etc/hadoop/conf/core-site.xml"
+    c.exec_command(command_formation)
+    time.sleep(5)
+
+
+def fsHandle():
+    current_fs = re.search('<value>(.*)</value>', getCurrentFS().strip()).group(1)
+    print("Current FS is: ", current_fs)
+    str_ozone = "ofs://ozone1"
+    str_ozone = str_ozone.replace("/", "\/")
+    str_HDFS = "hdfs://" + getHDFSNameNode() + ":8020"
+    str_HDFS = str_HDFS.replace("/", "\/")
+    current_fs = current_fs.replace("/", "\/")
+    if_switch = input("Do you want to switch the FS?\n")
+
+    if if_switch.lower() == "yes":
+        new_FS = str_ozone if current_fs == str_HDFS else str_HDFS
+    else:
+        new_FS = current_fs
+    print(new_FS)
+    changeCoreSite(current_fs, new_FS)
+    return new_FS, str_ozone
+
+
+def teraGen(user, jar_loc):
+    command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
                         f"/tera/teraoutputs/terasort-input "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
     return stdout, stderr
 
 
-def teraSort(jar_loc):
-    command_formation = f"sudo -u pratyush /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} terasort " \
+def teraSort(user, jar_loc):
+    command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} terasort " \
                         f"/tera/teraoutputs/terasort-input /tera/teraoutputs/terasort-output "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
     return stdout, stderr
 
 
-def teraValidate(jar_loc):
-    command_formation = f"sudo -u pratyush /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teravalidate " \
+def teraValidate(user, jar_loc):
+    command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teravalidate " \
                         f"/tera/teraoutputs/terasort-output /tera/teraoutputs/teravalidate-output "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -57,8 +98,8 @@ def createDirectory():
     return stdout, stderr
 
 
-def removeDirectory():
-    command_formation = f"sudo -u pratyush ozone fs -rm -r -skipTrash ofs://ozone1/tera/"
+def removeDirectory(command):
+    command_formation = f"{command}"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
     return stdout, stderr
@@ -130,7 +171,7 @@ def plotGraph(teragen_result, terasort_result, teravalidate_result):
     properties = ['Elapsed:', 'Average Map Time', 'Average Shuffle Time', 'Average Merge Time', 'Average Reduce Time']
     tera_array = [teragen_result, terasort_result, teravalidate_result]
 
-    teragen_y, terasort_y, teravalidate_y = getTimeTaken(tera_array,properties)
+    teragen_y, terasort_y, teravalidate_y = getTimeTaken(tera_array, properties)
 
     barWidth = 0.25
     fig = plt.subplots(figsize=(12, 8))
@@ -166,16 +207,23 @@ c = sshConnect()
 
 
 def main():
-    # Clean the directory
-    removeDirectory()
-    print("Directory removed")
-    # Create the directory
-    createDirectory()
-    print("Directory created")
+    new_fs, str_ozone = fsHandle()
+    if new_fs == str_ozone:
+        # Clean the directory
+        removeDirectory("sudo -u pratyush ozone fs -rm -r -skipTrash ofs://ozone1/tera/")
+        print("Directory removed")
+        # Create the directory
+        createDirectory()
+        print("Directory created")
+        user = "pratyush"
+    else:
+        removeDirectory("hdfs dfs -rm -r -skipTrash /tera")
+        user = "hdfs"
+
     jar_loc = getJarLocation().strip()
 
     print("Teragen executing....")
-    stderr, stdout = teraGen(jar_loc)
+    stderr, stdout = teraGen(user, jar_loc)
     err_relaxed = stderr.read().decode().strip()
     print(err_relaxed)
     out = stdout.read().decode().strip()
@@ -183,7 +231,7 @@ def main():
     teragen_result = scrapeData(out)
 
     print("Terasort executing....")
-    stderr1, stdout1 = teraSort(jar_loc)
+    stderr1, stdout1 = teraSort(user, jar_loc)
     err_relaxed1 = stderr1.read().decode().strip()
     print(err_relaxed1)
     out1 = stdout1.read().decode().strip()
@@ -191,7 +239,7 @@ def main():
     terasort_result = scrapeData(out1)
 
     print("Teravalidate executing....")
-    stderr2, stdout2 = teraValidate(jar_loc)
+    stderr2, stdout2 = teraValidate(user, jar_loc)
     err_relaxed2 = stderr2.read().decode().strip()
     print(err_relaxed2)
     out2 = stdout2.read().decode().strip()
