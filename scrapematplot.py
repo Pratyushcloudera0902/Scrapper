@@ -1,7 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
 from matplotlib import pyplot as plt
-from matplotlib import pylab
 import re
 
 # Retrieve the HTML

@@ -142,6 +142,12 @@ def main():
     # print(out2)
     teravalidate_result = scrapeData(out2)
 
+
+    # Printing all logs
+    print(out)
+    print(out1)
+    print(out2)
+
     # Print the results
     print("Teragen result", teragen_result)
     print("Terasort result", terasort_result)
