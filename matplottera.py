@@ -97,6 +97,8 @@ plt.xticks([r + barWidth for r in range(len(teragen_y))],
            properties)
 
 plt.legend()
+plt.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='y', alpha=0.2)
+plt.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='x', alpha=0.2)
 plt.show()
 # # print(x)
 # # print(y)
