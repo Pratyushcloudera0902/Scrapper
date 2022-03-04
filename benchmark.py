@@ -8,17 +8,18 @@ import requests
 
 
 # SSH Connection to Ozone
-def sshConnect():  # done
+def sshConnect():   # done
     private_key = paramiko.RSAKey.from_private_key_file("myKeys", password="company")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    print("connecting...")
+    print("connecting....")
     client.connect(hostname="172.27.133.3", username="root", pkey=private_key, password="password")
     print("connected....")
     return client
 
 
-def getHDFSNameNode():
+# Get the HDFS nameNode
+def getHDFSNameNode():  # done
     command_formation = "hdfs getconf -namenodes"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -26,7 +27,8 @@ def getHDFSNameNode():
     return out
 
 
-def getCurrentFS():
+# Get the current FS
+def getCurrentFS():  # done
     command_formation = "grep  -m 1 '<value>' /etc/hadoop/conf/core-site.xml"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -34,13 +36,15 @@ def getCurrentFS():
     return out
 
 
-def changeCoreSite(current_fs, new_fs):
+# Change the core-site.xml 's fs.defaultFS value as according to ozone or HDFS chosen by the user
+def changeCoreSite(current_fs, new_fs):  # done
     command_formation = f"grep -i -m 1 '<value>' /etc/hadoop/conf/core-site.xml | sed -i '0,/{current_fs}/s//{new_fs}/' /etc/hadoop/conf/core-site.xml"
     c.exec_command(command_formation)
     time.sleep(5)
 
 
-def fsHandle():
+# Handle the FS, chose between ozone and HDFS
+def fsHandle():  # done
     current_fs = re.search('<value>(.*)</value>', getCurrentFS().strip()).group(1)
     print("Current FS is: ", current_fs)
     str_ozone = "ofs://ozone1"
@@ -59,7 +63,8 @@ def fsHandle():
     return new_FS, str_ozone
 
 
-def teraGen(user, jar_loc):
+# Run Teragen
+def teraGen(user, jar_loc):  # done
     command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
                         f"/tera/teraoutputs/terasort-input "
     stdin, stdout, stderr = c.exec_command(command_formation)
@@ -67,7 +72,8 @@ def teraGen(user, jar_loc):
     return stdout, stderr
 
 
-def teraSort(user, jar_loc):
+# Run Terasort
+def teraSort(user, jar_loc):  # done
     command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} terasort " \
                         f"/tera/teraoutputs/terasort-input /tera/teraoutputs/terasort-output "
     stdin, stdout, stderr = c.exec_command(command_formation)
@@ -75,7 +81,8 @@ def teraSort(user, jar_loc):
     return stdout, stderr
 
 
-def teraValidate(user, jar_loc):
+# Run Teravalidate
+def teraValidate(user, jar_loc):  # done
     command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teravalidate " \
                         f"/tera/teraoutputs/terasort-output /tera/teraoutputs/teravalidate-output "
     stdin, stdout, stderr = c.exec_command(command_formation)
@@ -83,7 +90,8 @@ def teraValidate(user, jar_loc):
     return stdout, stderr
 
 
-def getJarLocation():
+# Get the running jar
+def getJarLocation():  # done
     command_formation = f"find /opt/cloudera/parcels/CDH/jars -name '*hadoop*mapreduce*example*'"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -91,21 +99,24 @@ def getJarLocation():
     return out
 
 
-def createDirectory():
+# Create the directory, only for ozone cases
+def createDirectory():  # done
     command_formation = f"sudo -u pratyush ozone fs -mkdir -p ofs://ozone1/tera/teraoutputs/"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
     return stdout, stderr
 
 
-def removeDirectory(command):
+# Remove the directory, to avoid the already present directory errors
+def removeDirectory(command):  # done
     command_formation = f"{command}"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
     return stdout, stderr
 
 
-def scrapeData(output):
+# Scrape the data from the webpage
+def scrapeData(output):  # done
     url = re.search(r'The url to track the job: (.*)', output).group(1)
     # Retrieve the HTML
     html_content = requests.get(url).text
@@ -146,7 +157,8 @@ def scrapeData(output):
         return data
 
 
-def getTimeTaken(tera_array, properties):
+# Converting the time into seconds and presentable form
+def getTimeTaken(tera_array, properties):  # done
     y_arr = []
     for data in tera_array:
         y = []
@@ -167,7 +179,8 @@ def getTimeTaken(tera_array, properties):
     return y_arr
 
 
-def plotGraph(teragen_result, terasort_result, teravalidate_result):
+# Plot the graph from the scrapped data
+def plotGraph(teragen_result, terasort_result, teravalidate_result):  # done
     properties = ['Elapsed:', 'Average Map Time', 'Average Shuffle Time', 'Average Merge Time', 'Average Reduce Time']
     tera_array = [teragen_result, terasort_result, teravalidate_result]
 
@@ -197,7 +210,8 @@ def plotGraph(teragen_result, terasort_result, teravalidate_result):
     plt.show()
 
 
-def closeConnection():
+# Closing the connection
+def closeConnection():  # done
     c.close()
     print("SSH Closed....")
     exit(0)
@@ -207,7 +221,7 @@ c = sshConnect()
 
 
 def main():
-    new_fs, str_ozone = fsHandle()
+    new_fs, str_ozone = fsHandle()  # Handle between ozone and HDFS
     if new_fs == str_ozone:
         # Clean the directory
         removeDirectory("sudo -u pratyush ozone fs -rm -r -skipTrash ofs://ozone1/tera/")
@@ -256,9 +270,8 @@ def main():
     print("Terasort result", terasort_result)
     print("Teravalidate result", teravalidate_result)
 
-    plotGraph(teragen_result, terasort_result, teravalidate_result)
-
     # Plot graphs
+    plotGraph(teragen_result, terasort_result, teravalidate_result)
 
     # Close the connection
     closeConnection()
