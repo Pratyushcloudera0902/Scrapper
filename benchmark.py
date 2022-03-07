@@ -8,12 +8,12 @@ import requests
 
 
 # SSH Connection to Ozone
-def sshConnect():   # done
+def sshConnect():  # done
     private_key = paramiko.RSAKey.from_private_key_file("myKeys", password="company")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print("connecting....")
-    client.connect(hostname="172.27.133.3", username="root", pkey=private_key, password="password")
+    client.connect(hostname="172.27.38.132", username="root", pkey=private_key, password="password")
     print("connected....")
     return client
 
@@ -65,7 +65,7 @@ def fsHandle():  # done
 
 # Run Teragen
 def teraGen(user, jar_loc):  # done
-    command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
+    command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
                         f"/tera/teraoutputs/terasort-input "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -74,7 +74,7 @@ def teraGen(user, jar_loc):  # done
 
 # Run Terasort
 def teraSort(user, jar_loc):  # done
-    command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} terasort " \
+    command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} terasort " \
                         f"/tera/teraoutputs/terasort-input /tera/teraoutputs/terasort-output "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -83,7 +83,7 @@ def teraSort(user, jar_loc):  # done
 
 # Run Teravalidate
 def teraValidate(user, jar_loc):  # done
-    command_formation = f"sudo -u {user} /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teravalidate " \
+    command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teravalidate " \
                         f"/tera/teraoutputs/terasort-output /tera/teraoutputs/teravalidate-output "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -116,7 +116,7 @@ def removeDirectory(command):  # done
 
 
 # Scrape the data from the webpage
-def scrapeData(output):  # done
+def scrapeData(output, user, jar_loc):  # done
     url = re.search(r'The url to track the job: (.*)', output).group(1)
     # Retrieve the HTML
     html_content = requests.get(url).text
@@ -130,7 +130,7 @@ def scrapeData(output):  # done
     # Sometimes webpage created are empty, in those cases rerun the code.
     if tera_table is None:
         print("Empty webpage, retrying process again")
-        main()
+        main_exec(user, jar_loc)
         pass
     else:
         # Store all the headers
@@ -177,6 +177,45 @@ def getTimeTaken(tera_array, properties):  # done
         y_arr.append(y)
 
     return y_arr
+
+
+def main_exec(user, jar_loc):
+    print("Teragen executing....")
+    stderr, stdout = teraGen(user, jar_loc)
+    err_relaxed = stderr.read().decode().strip()
+    print(err_relaxed)
+    out = stdout.read().decode().strip()
+    print(out)
+    teragen_result = scrapeData(out, user, jar_loc)
+
+    print("Terasort executing....")
+    stderr1, stdout1 = teraSort(user, jar_loc)
+    err_relaxed1 = stderr1.read().decode().strip()
+    print(err_relaxed1)
+    out1 = stdout1.read().decode().strip()
+    # print(out1)
+    terasort_result = scrapeData(out1, user, jar_loc)
+
+    print("Teravalidate executing....")
+    stderr2, stdout2 = teraValidate(user, jar_loc)
+    err_relaxed2 = stderr2.read().decode().strip()
+    print(err_relaxed2)
+    out2 = stdout2.read().decode().strip()
+    # print(out2)
+    teravalidate_result = scrapeData(out2, user, jar_loc)
+
+    # Printing all logs
+    print(out)
+    print(out1)
+    print(out2)
+
+    # Print the results
+    print("Teragen result", teragen_result)
+    print("Terasort result", terasort_result)
+    print("Teravalidate result", teravalidate_result)
+
+    # Plot graphs
+    plotGraph(teragen_result, terasort_result, teravalidate_result)
 
 
 # Plot the graph from the scrapped data
@@ -231,47 +270,12 @@ def main():
         print("Directory created")
         user = "pratyush"
     else:
-        removeDirectory("hdfs dfs -rm -r -skipTrash /tera")
+        removeDirectory("sudo -u hdfs hdfs dfs -rm -r -skipTrash /tera")
         user = "hdfs"
 
     jar_loc = getJarLocation().strip()
 
-    print("Teragen executing....")
-    stderr, stdout = teraGen(user, jar_loc)
-    err_relaxed = stderr.read().decode().strip()
-    print(err_relaxed)
-    out = stdout.read().decode().strip()
-    # print(out)
-    teragen_result = scrapeData(out)
-
-    print("Terasort executing....")
-    stderr1, stdout1 = teraSort(user, jar_loc)
-    err_relaxed1 = stderr1.read().decode().strip()
-    print(err_relaxed1)
-    out1 = stdout1.read().decode().strip()
-    # print(out1)
-    terasort_result = scrapeData(out1)
-
-    print("Teravalidate executing....")
-    stderr2, stdout2 = teraValidate(user, jar_loc)
-    err_relaxed2 = stderr2.read().decode().strip()
-    print(err_relaxed2)
-    out2 = stdout2.read().decode().strip()
-    # print(out2)
-    teravalidate_result = scrapeData(out2)
-
-    # Printing all logs
-    print(out)
-    print(out1)
-    print(out2)
-
-    # Print the results
-    print("Teragen result", teragen_result)
-    print("Terasort result", terasort_result)
-    print("Teravalidate result", teravalidate_result)
-
-    # Plot graphs
-    plotGraph(teragen_result, terasort_result, teravalidate_result)
+    main_exec(user, jar_loc)
 
     # Close the connection
     closeConnection()
