@@ -8,8 +8,7 @@ import numpy as np
 import requests
 import urllib
 
-
-FILE_NAME = "testdfsio1"
+FILE_NAME = "myfile"
 N_FILES = '2'
 FILE_SIZE = '16KB'
 
@@ -88,7 +87,7 @@ def fsHandle(current_fs, str_HDFS, jar_loc):  # done
 
 
 # Run DFSIO
-def DFSIO(job_type, user, jar_loc,file_name):
+def DFSIO(job_type, user, jar_loc, file_name):
     command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} TestDFSIO -Dtest.build.data=/testing/benchmarks/outputs -{job_type} -nrFiles {N_FILES} -fileSize {FILE_SIZE} -resFile /tmp/{file_name}"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -280,10 +279,10 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
 
 
 def main_exec(user, jar_loc):
-    result = FILE_NAME + user + str(int(time.time()))
+    result = FILE_NAME + "_" + user + "_" + str(int(time.time()))
     print("DFSIO write executing....")
 
-    stderr, stdout = DFSIO('write', user, jar_loc,result)
+    stderr, stdout = DFSIO('write', user, jar_loc, result)
     err_relaxed = stderr.read().decode().strip()
     print(err_relaxed)
     out = stdout.read().decode().strip()
@@ -291,7 +290,7 @@ def main_exec(user, jar_loc):
     write_result = scrapeData(out, user, jar_loc)
 
     print("DFSIO read executing....")
-    stderr1, stdout1 = DFSIO('read', user, jar_loc,result)
+    stderr1, stdout1 = DFSIO('read', user, jar_loc, result)
     err_relaxed1 = stderr1.read().decode().strip()
     print(err_relaxed1)
     out1 = stdout1.read().decode().strip()

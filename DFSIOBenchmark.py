@@ -13,7 +13,7 @@ def sshConnect():  # done
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print("connecting....")
-    client.connect(hostname="172.27.197.72", username="root", pkey=private_key, password="password")
+    client.connect(hostname="172.27.38.132", username="root", pkey=private_key, password="password")
     print("connected....")
     return client
 
