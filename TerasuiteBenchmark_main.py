@@ -55,7 +55,7 @@ def run(str_ozone, current_fs, str_HDFS, jar_loc):
         removeDirectory(f"sudo -u {user} ozone fs -rm -r -skipTrash ofs://ozone1/tera/")
         print("Directory removed")
         # Create the directory
-        createDirectory()
+        createDirectory(user)
         print("Directory created")
 
     else:
@@ -83,7 +83,7 @@ def fsHandle(current_fs, str_HDFS, jar_loc):  # done
 
 
 # Run Teragen
-def teraGen(user, jar_loc):  # done
+def teraGen(user, jar_loc, data_record):  # done
     command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
                         f"/tera/teraoutputs/terasort-input "
     stdin, stdout, stderr = c.exec_command(command_formation)
@@ -119,8 +119,8 @@ def getJarLocation():  # done
 
 
 # Create the directory, only for ozone cases
-def createDirectory():  # done
-    command_formation = f"sudo -u pratyush ozone fs -mkdir -p ofs://ozone1/tera/teraoutputs/"
+def createDirectory(user):  # done
+    command_formation = f"sudo -u {user} ozone fs -mkdir -p ofs://ozone1/tera/teraoutputs/"
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
     return stdout, stderr
@@ -300,8 +300,9 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
 
 
 def main_exec(user, jar_loc):
+    DATA_RECORD = 1000
     print("Teragen executing....")
-    stderr, stdout = teraGen(user, jar_loc)
+    stderr, stdout = teraGen(user, jar_loc, DATA_RECORD)
     err_relaxed = stderr.read().decode().strip()
     print(err_relaxed)
     out = stdout.read().decode().strip()
