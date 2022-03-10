@@ -85,7 +85,7 @@ def fsHandle(current_fs, str_HDFS, jar_loc):  # done
 
 
 # Run Teragen
-def teraGen(user, jar_loc, data_record):  # done
+def teraGen(user, jar_loc):  # done
     command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
                         f"/tera/teraoutputs/terasort-input "
     stdin, stdout, stderr = c.exec_command(command_formation)
@@ -303,7 +303,7 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
 
 def main_exec(user, jar_loc):
     print("Teragen executing....")
-    stderr, stdout = teraGen(user, jar_loc, DATA_RECORD)
+    stderr, stdout = teraGen(user, jar_loc)
     err_relaxed = stderr.read().decode().strip()
     print(err_relaxed)
     out = stdout.read().decode().strip()
