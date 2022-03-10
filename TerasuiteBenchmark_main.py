@@ -45,20 +45,8 @@ def changeCoreSite(current_fs, new_fs):  # done
     time.sleep(5)
 
 
-# Handle the FS, chose between ozone and HDFS
-def fsHandle(current_fs, str_HDFS):  # done
-    print("Current FS is: ", current_fs)
-    str_ozone = "ofs://ozone1"
-    str_ozone = str_ozone.replace("/", "\/")
-    str_HDFS = str_HDFS.replace("/", "\/")
-    current_fs = current_fs.replace("/", "\/")
-    # if_switch = input("Do you want to switch the FS?\n")
-
-    if_switch = "no"
-    if if_switch.lower() == "yes":
-        new_FS = str_ozone if current_fs == str_HDFS else str_HDFS
-    else:
-        new_FS = current_fs
+def run(str_ozone, current_fs, str_HDFS, jar_loc):
+    new_FS = str_ozone if current_fs == str_HDFS else str_HDFS
     print(new_FS)
     changeCoreSite(current_fs, new_FS)
     if new_FS == str_ozone:
@@ -72,7 +60,25 @@ def fsHandle(current_fs, str_HDFS):  # done
     else:
         removeDirectory("sudo -u hdfs hdfs dfs -rm -r -skipTrash /tera")
         user = "hdfs"
-    return user
+
+    data_to_plot = main_exec(user, jar_loc)
+    return new_FS, data_to_plot
+
+
+# Handle the FS, chose between ozone and HDFS
+def fsHandle(current_fs, str_HDFS, jar_loc):  # done
+    print("Current FS is: ", current_fs)
+    str_ozone = "ofs://ozone1"
+    str_ozone = str_ozone.replace("/", "\/")
+    str_HDFS = str_HDFS.replace("/", "\/")
+    current_fs = current_fs.replace("/", "\/")
+    # if_switch = input("Do you want to switch the FS?\n")
+
+    current_fs, data_to_plot_1 = run(str_ozone, current_fs, str_HDFS, jar_loc)
+    data_1_FS = "HDFS" if "hdfs" in current_fs else "OZONE"
+    current_fs, data_to_plot_2 = run(str_ozone, current_fs, str_HDFS, jar_loc)
+    data_2_FS = "HDFS" if "hdfs" in current_fs else "OZONE"
+    return data_to_plot_1, data_1_FS, data_to_plot_2, data_2_FS
 
 
 # Run Teragen
@@ -237,34 +243,58 @@ def retrieveDataFromMongo():
 
 
 # Plot the graph from the scrapped data
-def plotGraph(data):  # done
+def plotGraph(data1, data2, data1_fs, data2_fs):  # done
     properties = ['Elapsed:', 'Average Map Time', 'Average Shuffle Time', 'Average Merge Time', 'Average Reduce Time']
-    tera_array = data[0]
+    tera_array1 = data1[0]
+    tera_array2 = data2[0]
     # print("Data before")
     # print(data)
-    teragen_y, terasort_y, teravalidate_y = getTimeTaken(tera_array, properties)
+    teragen_y1, terasort_y1, teravalidate_y1 = getTimeTaken(tera_array1, properties)
+    teragen_y2, terasort_y2, teravalidate_y2 = getTimeTaken(tera_array2, properties)
     # print(teragen_y, terasort_y, teravalidate_y)
+
     barWidth = 0.25
-    fig = plt.subplots(figsize=(12, 8))
-    br1 = np.arange(len(teragen_y))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(25, 10))
+    br1 = np.arange(len(teragen_y1))
     br2 = [x + barWidth for x in br1]
     br3 = [x + barWidth for x in br2]
 
-    plt.bar(br1, teragen_y, color='r', width=barWidth,
+    ax1.bar(br1, teragen_y1, color='r', width=barWidth,
             edgecolor='grey', label='Teragen')
-    plt.bar(br2, terasort_y, color='g', width=barWidth,
+    ax1.bar(br2, terasort_y1, color='g', width=barWidth,
             edgecolor='grey', label='Terasort')
-    plt.bar(br3, teravalidate_y, color='b', width=barWidth,
+    ax1.bar(br3, teravalidate_y1, color='b', width=barWidth,
             edgecolor='grey', label='Teravalidate')
 
-    plt.xlabel('Metric', fontweight='bold', fontsize=15, labelpad=15)
-    plt.ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=15)
-    plt.xticks([r + barWidth for r in range(len(teragen_y))],
-               properties)
+    ax2.bar(br1, teragen_y2, color='r', width=barWidth,
+            edgecolor='grey', label='Teragen')
+    ax2.bar(br2, terasort_y2, color='g', width=barWidth,
+            edgecolor='grey', label='Terasort')
+    ax2.bar(br3, teravalidate_y2, color='b', width=barWidth,
+            edgecolor='grey', label='Teravalidate')
 
-    plt.legend()
-    plt.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='y', alpha=0.2)
-    plt.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='x', alpha=0.2)
+    ax1.set_xlabel('Metric', fontweight='bold', fontsize=15, labelpad=10)
+    ax1.set_ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=10)
+    ax1.set_xticks([r + barWidth for r in range(len(teragen_y1))],
+                   properties, rotation=-8)
+
+    ax2.set_xlabel('Metric', fontweight='bold', fontsize=15, labelpad=10)
+    ax2.set_ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=10)
+    ax2.set_xticks([r + barWidth for r in range(len(teragen_y2))],
+                   properties, rotation=-8)
+
+    ax1.legend()
+    ax2.legend()
+
+    ax1.set_title(data1_fs, fontweight="bold")
+    ax2.set_title(data2_fs, fontweight="bold")
+
+    ax1.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='y', alpha=0.2)
+    ax1.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='x', alpha=0.2)
+
+    ax2.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='y', alpha=0.2)
+    ax2.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='x', alpha=0.2)
+    # plt.tight_layout()
     plt.show()
 
 
@@ -312,9 +342,8 @@ def main_exec(user, jar_loc):
     }
     updateToMongo(tera_results)
     data = retrieveDataFromMongo()
-    # print("retrieving from mongo", data)
-    # Plot graphs
-    plotGraph(data)
+    print("retrieving from mongo", data)
+    return data
 
 
 # Closing the connection
@@ -332,10 +361,9 @@ def main():
     current_fs = re.search('<value>(.*)</value>', getCurrentFS().strip()).group(1)
     str_HDFS = "hdfs://" + getHDFSNameNode() + ":8020"
 
-    user = fsHandle(current_fs, str_HDFS)  # Handle between ozone and HDFS
-
-    main_exec(user, jar_loc)
-
+    data1, data1_fs, data2, data2_fs = fsHandle(current_fs, str_HDFS, jar_loc)  # Handle between ozone and HDFS
+    plotGraph(data1, data2, data1_fs, data2_fs)
+    # plotGraph(data2)
     # Close the connection
     closeConnection()
 
