@@ -8,6 +8,8 @@ import numpy as np
 import requests
 import urllib
 
+DATA_RECORD = 1000
+
 
 # SSH Connection to Ozone
 def sshConnect():  # done
@@ -287,8 +289,8 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
     ax1.legend()
     ax2.legend()
 
-    ax1.set_title(data1_fs, fontweight="bold")
-    ax2.set_title(data2_fs, fontweight="bold")
+    ax1.set_title(data1_fs + f"\n Data records: {DATA_RECORD}", fontweight="bold")
+    ax2.set_title(data2_fs + f"\n Data records: {DATA_RECORD}", fontweight="bold")
 
     ax1.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='y', alpha=0.2)
     ax1.grid(color='#95a5a6', linestyle='solid', linewidth=1, axis='x', alpha=0.2)
@@ -300,7 +302,6 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
 
 
 def main_exec(user, jar_loc):
-    DATA_RECORD = 1000
     print("Teragen executing....")
     stderr, stdout = teraGen(user, jar_loc, DATA_RECORD)
     err_relaxed = stderr.read().decode().strip()
