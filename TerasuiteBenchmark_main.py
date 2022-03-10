@@ -50,16 +50,17 @@ def run(str_ozone, current_fs, str_HDFS, jar_loc):
     print(new_FS)
     changeCoreSite(current_fs, new_FS)
     if new_FS == str_ozone:
+        user = "systest"
         # Clean the directory
-        removeDirectory("sudo -u pratyush ozone fs -rm -r -skipTrash ofs://ozone1/tera/")
+        removeDirectory(f"sudo -u {user} ozone fs -rm -r -skipTrash ofs://ozone1/tera/")
         print("Directory removed")
         # Create the directory
         createDirectory()
         print("Directory created")
-        user = "pratyush"
+
     else:
-        removeDirectory("sudo -u hdfs hdfs dfs -rm -r -skipTrash /tera")
         user = "hdfs"
+        removeDirectory(f"sudo -u {user} hdfs dfs -rm -r -skipTrash /tera")
 
     data_to_plot = main_exec(user, jar_loc)
     return new_FS, data_to_plot
