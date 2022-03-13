@@ -47,15 +47,26 @@ def changeCoreSite(current_fs, new_fs):  # done
     time.sleep(5)
 
 
-def run(str_ozone, current_fs, str_HDFS, jar_loc):
-    new_FS = str_ozone if current_fs == str_HDFS else str_HDFS
-    print(new_FS)
-    changeCoreSite(current_fs, new_FS)
-    if new_FS == str_ozone:
+def getCdhVersion():
+    command_formation = f"ls -l /opt/cloudera/parcels"
+    stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
+    result = stdout.read().decode().strip()
+    lists = result.split("\n")[2].split(" ")
+    required_string = lists[len(lists) - 1].split("-")[1]
+    return required_string
+
+
+def run(str_ozone, current_fs, jar_loc):
+    # f"sudo -u {user} ozone fs -rm -r -skipTrash ofs://ozone1/tera/"
+    # f"sudo -u {user} hdfs dfs -rm -r -skipTrash /tera"
+    print("\nCurrent FS is : ", current_fs.replace("\/", "/"))
+    print(current_fs)
+    if current_fs == str_ozone:
         user = "systest"
         # Clean the directory
         removeDirectory(f"sudo -u {user} ozone fs -rm -r -skipTrash ofs://ozone1/tera/")
-        print("Directory removed")
+        print("Directory cleaned")
         # Create the directory
         createDirectory(user)
         print("Directory created")
@@ -63,24 +74,29 @@ def run(str_ozone, current_fs, str_HDFS, jar_loc):
     else:
         user = "hdfs"
         removeDirectory(f"sudo -u {user} hdfs dfs -rm -r -skipTrash /tera")
-
-    data_to_plot = main_exec(user, jar_loc)
-    return new_FS, data_to_plot
+        print("Directory cleaned")
+    FS = "HDFS" if "hdfs" in current_fs else "OZONE"  # Getting the current FS name
+    data_to_plot = main_exec(user, jar_loc, FS)
+    return FS, data_to_plot
 
 
 # Handle the FS, chose between ozone and HDFS
 def fsHandle(current_fs, str_HDFS, jar_loc):  # done
-    print("Current FS is: ", current_fs)
+    # print("Current FS is: ", current_fs)
     str_ozone = "ofs://ozone1"
     str_ozone = str_ozone.replace("/", "\/")
     str_HDFS = str_HDFS.replace("/", "\/")
     current_fs = current_fs.replace("/", "\/")
     # if_switch = input("Do you want to switch the FS?\n")
 
-    current_fs, data_to_plot_1 = run(str_ozone, current_fs, str_HDFS, jar_loc)
-    data_1_FS = "HDFS" if "hdfs" in current_fs else "OZONE"
-    current_fs, data_to_plot_2 = run(str_ozone, current_fs, str_HDFS, jar_loc)
-    data_2_FS = "HDFS" if "hdfs" in current_fs else "OZONE"
+    data_1_FS, data_to_plot_1 = run(str_ozone, current_fs, jar_loc)
+
+    old_fs = current_fs
+    current_fs = str_ozone if current_fs == str_HDFS else str_HDFS
+    changeCoreSite(old_fs, current_fs)
+
+    data_2_FS, data_to_plot_2 = run(str_ozone, current_fs, jar_loc)
+
     return data_to_plot_1, data_1_FS, data_to_plot_2, data_2_FS
 
 
@@ -216,31 +232,36 @@ def removeExtraKeys(teragen_result, terasort_result, teravalidate_result):
     return teragen_result, terasort_result, teravalidate_result
 
 
-def updateToMongo(docs):
+def updateToMongo(doc):
     url = "mongodb+srv://" + urllib.parse.quote_plus("pratyushbhatt1617") + ":" + urllib.parse.quote_plus(
         "Pratyush@123") + \
           "@cluster0.ckxbw.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
 
     cluster = MongoClient(url)
-    db = cluster["benchmark"]
-    collection = db["Terasuite"]
-    collection.insert_one(docs)
+    db = cluster["Benchmark2"]
+    collection = db[CDH_VERSION]
+    collection.insert_one(doc)
 
 
-def retrieveDataFromMongo():
+def retrieveDataFromMongo(is_tera, FS):
     url = "mongodb+srv://" + urllib.parse.quote_plus("pratyushbhatt1617") + ":" + urllib.parse.quote_plus(
         "Pratyush@123") + \
           "@cluster0.ckxbw.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
 
     cluster = MongoClient(url)
-    db = cluster["benchmark"]
-    collection = db["Terasuite"]
+    db = cluster["Benchmark2"]
+    collection = db[CDH_VERSION]
 
-    dict_array = collection.find().sort("_id", -1).limit(5)
+    dict_array = collection.find().sort("time_stamp", -1).limit(20)
     last_five_days_Data = []
+    counter = 0
     for key in dict_array:
-        lists = [key['teragen'], key['terasort'], key['teravalidate']]
-        last_five_days_Data.append(lists)
+        if counter == 5:
+            break
+        if key['is_tera'] == is_tera and key['file_system'] == FS:
+            lists = [key['teragen'], key['terasort'], key['teravalidate']]
+            last_five_days_Data.append(lists)
+            counter += 1
 
     return last_five_days_Data
 
@@ -301,7 +322,7 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
     plt.show()
 
 
-def main_exec(user, jar_loc):
+def main_exec(user, jar_loc, FS):
     print("Teragen executing....")
     stderr, stdout = teraGen(user, jar_loc)
     err_relaxed = stderr.read().decode().strip()
@@ -339,12 +360,16 @@ def main_exec(user, jar_loc):
     print("Terasort result", terasort_result)
     print("Teravalidate result", teravalidate_result)
     tera_results = {
+        "file_system": FS,
+        "is_tera": True,
+        "time_stamp": int(time.time()),
         "teragen": teragen_result,
         "terasort": terasort_result,
         "teravalidate": teravalidate_result
     }
     updateToMongo(tera_results)
-    data = retrieveDataFromMongo()
+    is_tera = True
+    data = retrieveDataFromMongo(is_tera, FS)
     print("retrieving from mongo", data)
     return data
 
@@ -357,6 +382,7 @@ def closeConnection():  # done
 
 
 c = sshConnect()
+CDH_VERSION = getCdhVersion()
 
 
 def main():

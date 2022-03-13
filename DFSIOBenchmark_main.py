@@ -49,40 +49,53 @@ def changeCoreSite(current_fs, new_fs):  # done
     time.sleep(5)
 
 
-def run(str_ozone, current_fs, str_HDFS, jar_loc):
-    new_FS = str_ozone if current_fs == str_HDFS else str_HDFS
-    print(new_FS)
-    changeCoreSite(current_fs, new_FS)
-    if new_FS == str_ozone:
+def getCdhVersion():
+    command_formation = f"ls -l /opt/cloudera/parcels"
+    stdin, stdout, stderr = c.exec_command(command_formation)
+    time.sleep(5)
+    result = stdout.read().decode().strip()
+    lists = result.split("\n")[2].split(" ")
+    required_string = lists[len(lists) - 1].split("-")[1]
+    return required_string
+
+
+def run(str_ozone, current_fs, jar_loc):
+    print("\nCurrent FS is : ", current_fs.replace("\/","/"))
+    if current_fs == str_ozone:
         user = "systest"
         # Clean the directory
         removeDirectory(f"sudo -u {user} ozone fs -rm -r -skipTrash ofs://ozone1/testing/")
-        print("Directory removed")
+        print("Directory cleaned")
         # Create the directory
         createDirectory(user)
         print("Directory created")
 
     else:
         user = "hdfs"
+        print("Directory cleaned")
         removeDirectory(f"sudo -u {user} -s hdfs dfs -rm -r -skipTrash /testing")
-
-    data_to_plot = main_exec(user, jar_loc)
-    return new_FS, data_to_plot
+    FS = "HDFS" if "hdfs" in current_fs else "OZONE"  # Getting the current FS name
+    data_to_plot = main_exec(user, jar_loc, FS)
+    return FS, data_to_plot
 
 
 # Handle the FS, chose between ozone and HDFS
 def fsHandle(current_fs, str_HDFS, jar_loc):  # done
-    print("Current FS is: ", current_fs)
+    # print("Current FS is: ", current_fs)
     str_ozone = "ofs://ozone1"
     str_ozone = str_ozone.replace("/", "\/")
     str_HDFS = str_HDFS.replace("/", "\/")
     current_fs = current_fs.replace("/", "\/")
     # if_switch = input("Do you want to switch the FS?\n")
 
-    current_fs, data_to_plot_1 = run(str_ozone, current_fs, str_HDFS, jar_loc)
-    data_1_FS = "HDFS" if "hdfs" in current_fs else "OZONE"
-    current_fs, data_to_plot_2 = run(str_ozone, current_fs, str_HDFS, jar_loc)
-    data_2_FS = "HDFS" if "hdfs" in current_fs else "OZONE"
+    data_1_FS, data_to_plot_1 = run(str_ozone, current_fs, jar_loc)
+
+    old_fs = current_fs
+    current_fs = str_ozone if current_fs == str_HDFS else str_HDFS
+    changeCoreSite(old_fs, current_fs)
+
+    data_2_FS, data_to_plot_2 = run(str_ozone, current_fs, jar_loc)
+
     return data_to_plot_1, data_1_FS, data_to_plot_2, data_2_FS
 
 
@@ -198,15 +211,15 @@ def removeExtraKeys(write_result, read_result):
     return write_result, read_result
 
 
-def updateToMongo(docs):
+def updateToMongo(doc):
     url = "mongodb+srv://" + urllib.parse.quote_plus("pratyushbhatt1617") + ":" + urllib.parse.quote_plus(
         "Pratyush@123") + \
           "@cluster0.ckxbw.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
 
     cluster = MongoClient(url)
-    db = cluster["benchmark"]
-    collection = db["dfsio"]
-    collection.insert_one(docs)
+    db = cluster["Benchmark2"]
+    collection = db[CDH_VERSION]
+    collection.insert_one(doc)
 
 
 def retrieveDataFromMongo():
@@ -215,14 +228,19 @@ def retrieveDataFromMongo():
           "@cluster0.ckxbw.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
 
     cluster = MongoClient(url)
-    db = cluster["benchmark"]
-    collection = db["dfsio"]
+    db = cluster["Benchmark2"]
+    collection = db[CDH_VERSION]
 
-    dict_array = collection.find().sort("_id", -1).limit(5)
+    dict_array = collection.find().sort("time_stamp", -1).limit(20)
     last_five_days_Data = []
+    counter = 0
     for key in dict_array:
-        lists = [key['write'], key['read']]
-        last_five_days_Data.append(lists)
+        if counter == 5:
+            break
+        if not key['is_tera']:
+            lists = [key['write'], key['read']]
+            last_five_days_Data.append(lists)
+            counter += 1
 
     return last_five_days_Data
 
@@ -278,9 +296,9 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
     plt.show()
 
 
-def main_exec(user, jar_loc):
+def main_exec(user, jar_loc, FS):
     result = FILE_NAME + "_" + user + "_" + str(int(time.time()))
-    print("DFSIO write executing....")
+    print("\nDFSIO write executing....")
 
     stderr, stdout = DFSIO('write', user, jar_loc, result)
     err_relaxed = stderr.read().decode().strip()
@@ -289,7 +307,7 @@ def main_exec(user, jar_loc):
     print(out)
     write_result = scrapeData(out, user, jar_loc)
 
-    print("DFSIO read executing....")
+    print("\nDFSIO read executing....")
     stderr1, stdout1 = DFSIO('read', user, jar_loc, result)
     err_relaxed1 = stderr1.read().decode().strip()
     print(err_relaxed1)
@@ -307,11 +325,14 @@ def main_exec(user, jar_loc):
     print("Write result", write_result)
     print("Read result", read_result)
 
-    dfsio_results = {
+    DFSIO_results = {
+        "file_system": FS,
+        "is_tera": False,
+        "time_stamp": int(time.time()),
         "write": write_result,
         "read": read_result,
     }
-    updateToMongo(dfsio_results)
+    updateToMongo(DFSIO_results)
     data = retrieveDataFromMongo()
     print("retrieving from mongo", data)
     return data
@@ -325,6 +346,7 @@ def closeConnection():  # done
 
 
 c = sshConnect()
+CDH_VERSION = getCdhVersion()
 
 
 def main():
