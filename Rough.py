@@ -50,13 +50,31 @@
 # print(l,type(l))
 
 
-st = "hdfs://pratyush-1.pratyush.root.hwx.site:8020"
+# st = "hdfs://pratyush-1.pratyush.root.hwx.site:8020"
+#
+# st1 = st.replace("/","\/")
+# print(st.replace("/","\/"))
+# print(st1)
+# print(st)
 
-st1 = st.replace("/","\/")
-print(st.replace("/","\/"))
-print(st1)
-print(st)
+# from configparser import ConfigParser
+#
+# file = 'config.ini'
+# config = ConfigParser()
+# config.read(file)
+#
+# print(config.sections())
+# print(config['terasuite'])
+# print(list(config['terasuite']))
+# print(config['dfsio'])
+# print(list(config['dfsio']))
+#
+# print(config['terasuite']['DATA_RECORD'])
 
-
-
-
+# import time
+# # 1647248538
+# t = int(time.time())
+# print(t)
+# print(t)
+# print(time.asctime(time.localtime(t)))
+# print(time.asctime(time.localtime(1647248538)))

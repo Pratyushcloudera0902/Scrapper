@@ -9,8 +9,8 @@ import requests
 import urllib
 
 FILE_NAME = "myfile"
-N_FILES = '2'
-FILE_SIZE = '16KB'
+N_FILES = '32'
+FILE_SIZE = '1GB'
 
 
 # SSH Connection to Ozone
@@ -19,7 +19,7 @@ def sshConnect():  # done
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print("connecting....")
-    client.connect(hostname="172.27.38.132", username="root", pkey=private_key, password="password")
+    client.connect(hostname="172.27.68.134", username="root", pkey=private_key, password="password")
     print("connected....")
     return client
 
@@ -60,7 +60,7 @@ def getCdhVersion():
 
 
 def run(str_ozone, current_fs, jar_loc):
-    print("\nCurrent FS is : ", current_fs.replace("\/","/"))
+    print("\nCurrent FS is : ", current_fs.replace("\/", "/"))
     if current_fs == str_ozone:
         user = "systest"
         # Clean the directory
@@ -133,7 +133,7 @@ def removeDirectory(command):  # done
 
 
 # Scrape the data from the webpage
-def scrapeData(output, user, jar_loc):  # done
+def scrapeData(output):  # done
     url = re.search(r'The url to track the job: (.*)', output).group(1)
     # Retrieve the HTML
     html_content = requests.get(url).text
@@ -147,7 +147,7 @@ def scrapeData(output, user, jar_loc):  # done
     # Sometimes webpage created are empty, in those cases rerun the code.
     if tera_table is None:
         print("Empty webpage, retrying process again")
-        main_exec(user, jar_loc)
+        main()
         pass
     else:
         # Store all the headers
@@ -222,7 +222,11 @@ def updateToMongo(doc):
     collection.insert_one(doc)
 
 
-def retrieveDataFromMongo():
+def compareResultWithPast(last_five_days):
+    pass
+
+
+def retrieveDataFromMongo(is_tera, FS):
     url = "mongodb+srv://" + urllib.parse.quote_plus("pratyushbhatt1617") + ":" + urllib.parse.quote_plus(
         "Pratyush@123") + \
           "@cluster0.ckxbw.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
@@ -237,7 +241,7 @@ def retrieveDataFromMongo():
     for key in dict_array:
         if counter == 5:
             break
-        if not key['is_tera']:
+        if key['is_tera'] == is_tera and key['file_system'] == FS:
             lists = [key['write'], key['read']]
             last_five_days_Data.append(lists)
             counter += 1
@@ -272,12 +276,12 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
             edgecolor='grey', label='read')
 
     ax1.set_xlabel('Metric', fontweight='bold', fontsize=15, labelpad=10)
-    ax1.set_ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=10)
+    ax1.set_ylabel('Time taken in seconds', fontweight='bold', fontsize=15, labelpad=10)
     ax1.set_xticks([r + barWidth for r in range(len(write_1))],
                    properties, rotation=-8)
 
     ax2.set_xlabel('Metric', fontweight='bold', fontsize=15, labelpad=10)
-    ax2.set_ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=10)
+    ax2.set_ylabel('Time taken in seconds', fontweight='bold', fontsize=15, labelpad=10)
     ax2.set_xticks([r + barWidth for r in range(len(write_2))],
                    properties, rotation=-8)
 
@@ -305,7 +309,7 @@ def main_exec(user, jar_loc, FS):
     print(err_relaxed)
     out = stdout.read().decode().strip()
     print(out)
-    write_result = scrapeData(out, user, jar_loc)
+    write_result = scrapeData(out)
 
     print("\nDFSIO read executing....")
     stderr1, stdout1 = DFSIO('read', user, jar_loc, result)
@@ -313,7 +317,7 @@ def main_exec(user, jar_loc, FS):
     print(err_relaxed1)
     out1 = stdout1.read().decode().strip()
     # print(out1)
-    read_result = scrapeData(out1, user, jar_loc)
+    read_result = scrapeData(out1)
 
     # Printing all logs
     print(out)
@@ -333,7 +337,8 @@ def main_exec(user, jar_loc, FS):
         "read": read_result,
     }
     updateToMongo(DFSIO_results)
-    data = retrieveDataFromMongo()
+    is_tera = False
+    data = retrieveDataFromMongo(is_tera, FS)
     print("retrieving from mongo", data)
     return data
 
@@ -347,14 +352,13 @@ def closeConnection():  # done
 
 c = sshConnect()
 CDH_VERSION = getCdhVersion()
+jar_location = getJarLocation().strip()
 
 
 def main():
-    jar_loc = getJarLocation().strip()
-    current_fs = re.search('<value>(.*)</value>', getCurrentFS().strip()).group(1)
     str_HDFS = "hdfs://" + getHDFSNameNode() + ":8020"
-
-    data1, data1_fs, data2, data2_fs = fsHandle(current_fs, str_HDFS, jar_loc)  # Handle between ozone and HDFS
+    current_fs = re.search('<value>(.*)</value>', getCurrentFS().strip()).group(1)
+    data1, data1_fs, data2, data2_fs = fsHandle(current_fs, str_HDFS, jar_location)  # Handle between ozone and HDFS
     plotGraph(data1, data2, data1_fs, data2_fs)
     # plotGraph(data2)
     # Close the connection

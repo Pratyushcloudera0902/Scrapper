@@ -8,7 +8,7 @@ import numpy as np
 import requests
 import urllib
 
-DATA_RECORD = 1000
+DATA_RECORD = 100000000
 
 
 # SSH Connection to Ozone
@@ -17,7 +17,7 @@ def sshConnect():  # done
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print("connecting....")
-    client.connect(hostname="172.27.38.132", username="root", pkey=private_key, password="password")
+    client.connect(hostname="172.27.68.134", username="root", pkey=private_key, password="password")
     print("connected....")
     return client
 
@@ -61,7 +61,6 @@ def run(str_ozone, current_fs, jar_loc):
     # f"sudo -u {user} ozone fs -rm -r -skipTrash ofs://ozone1/tera/"
     # f"sudo -u {user} hdfs dfs -rm -r -skipTrash /tera"
     print("\nCurrent FS is : ", current_fs.replace("\/", "/"))
-    print(current_fs)
     if current_fs == str_ozone:
         user = "systest"
         # Clean the directory
@@ -102,7 +101,7 @@ def fsHandle(current_fs, str_HDFS, jar_loc):  # done
 
 # Run Teragen
 def teraGen(user, jar_loc):  # done
-    command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen 1000 " \
+    command_formation = f"sudo -u {user} -s /opt/cloudera/parcels/CDH/bin/hadoop jar {jar_loc} teragen {DATA_RECORD} " \
                         f"/tera/teraoutputs/terasort-input "
     stdin, stdout, stderr = c.exec_command(command_formation)
     time.sleep(5)
@@ -153,7 +152,7 @@ def removeDirectory(command):  # done
 
 
 # Scrape the data from the webpage
-def scrapeData(output, user, jar_loc):  # done
+def scrapeData(output):  # done
     url = re.search(r'The url to track the job: (.*)', output).group(1)
     # Retrieve the HTML
     html_content = requests.get(url).text
@@ -167,7 +166,7 @@ def scrapeData(output, user, jar_loc):  # done
     # Sometimes webpage created are empty, in those cases rerun the code.
     if tera_table is None:
         print("Empty webpage, retrying process again")
-        main_exec(user, jar_loc)
+        main()
         pass
     else:
         # Store all the headers
@@ -298,12 +297,12 @@ def plotGraph(data1, data2, data1_fs, data2_fs):  # done
             edgecolor='grey', label='Teravalidate')
 
     ax1.set_xlabel('Metric', fontweight='bold', fontsize=15, labelpad=10)
-    ax1.set_ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=10)
+    ax1.set_ylabel('Time taken in seconds', fontweight='bold', fontsize=15, labelpad=10)
     ax1.set_xticks([r + barWidth for r in range(len(teragen_y1))],
                    properties, rotation=-8)
 
     ax2.set_xlabel('Metric', fontweight='bold', fontsize=15, labelpad=10)
-    ax2.set_ylabel('Time taken', fontweight='bold', fontsize=15, labelpad=10)
+    ax2.set_ylabel('Time taken in seconds', fontweight='bold', fontsize=15, labelpad=10)
     ax2.set_xticks([r + barWidth for r in range(len(teragen_y2))],
                    properties, rotation=-8)
 
@@ -329,7 +328,7 @@ def main_exec(user, jar_loc, FS):
     print(err_relaxed)
     out = stdout.read().decode().strip()
     # print(out)
-    teragen_result = scrapeData(out, user, jar_loc)
+    teragen_result = scrapeData(out)
 
     print("Terasort executing....")
     stderr1, stdout1 = teraSort(user, jar_loc)
@@ -337,7 +336,7 @@ def main_exec(user, jar_loc, FS):
     print(err_relaxed1)
     out1 = stdout1.read().decode().strip()
     # print(out1)
-    terasort_result = scrapeData(out1, user, jar_loc)
+    terasort_result = scrapeData(out1)
 
     print("Teravalidate executing....")
     stderr2, stdout2 = teraValidate(user, jar_loc)
@@ -345,7 +344,7 @@ def main_exec(user, jar_loc, FS):
     print(err_relaxed2)
     out2 = stdout2.read().decode().strip()
     # print(out2)
-    teravalidate_result = scrapeData(out2, user, jar_loc)
+    teravalidate_result = scrapeData(out2)
 
     # Printing all logs
     print(out)
@@ -383,14 +382,14 @@ def closeConnection():  # done
 
 c = sshConnect()
 CDH_VERSION = getCdhVersion()
+jar_location = getJarLocation().strip()
 
 
 def main():
-    jar_loc = getJarLocation().strip()
     current_fs = re.search('<value>(.*)</value>', getCurrentFS().strip()).group(1)
     str_HDFS = "hdfs://" + getHDFSNameNode() + ":8020"
 
-    data1, data1_fs, data2, data2_fs = fsHandle(current_fs, str_HDFS, jar_loc)  # Handle between ozone and HDFS
+    data1, data1_fs, data2, data2_fs = fsHandle(current_fs, str_HDFS, jar_location)  # Handle between ozone and HDFS
     plotGraph(data1, data2, data1_fs, data2_fs)
     # plotGraph(data2)
     # Close the connection
